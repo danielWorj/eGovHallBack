@@ -1,7 +1,7 @@
 package com.example.eHall.Controller.Domaine;
 
 import com.example.eHall.Dto.Domaine.StructureDto;
-import com.example.eHall.Entity.Domaine.Structure;
+import com.example.eHall.Entity.Domaine.Etablissement;
 import com.example.eHall.Entity.Server.ServerReponse;
 import com.example.eHall.Repository.Domaine.StructureRepository;
 import com.example.eHall.Repository.Domaine.TypeStructureRepository;
@@ -23,7 +23,7 @@ public class DomaineControllerImpl implements DomaineControllerInt{
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public ResponseEntity<List<Structure>> findAllStructure() {
+    public ResponseEntity<List<Etablissement>> findAllStructure() {
         return ResponseEntity.ok(this.structureRepository.findAll());
     }
 
@@ -31,7 +31,7 @@ public class DomaineControllerImpl implements DomaineControllerInt{
     public ResponseEntity<ServerReponse> createStructure(String structure) {
         StructureDto structureDto = this.objectMapper.readValue(structure, StructureDto.class);
 
-        Structure structureDB = new Structure();
+        Etablissement structureDB = new Etablissement();
 
         structureDB.setNom(structureDto.getNom());
         structureDB.setActif(false);
@@ -50,7 +50,7 @@ public class DomaineControllerImpl implements DomaineControllerInt{
     public ResponseEntity<ServerReponse> updateStructure(String structure) {
         StructureDto structureDto = this.objectMapper.readValue(structure, StructureDto.class);
 
-        Structure structureDB = new Structure();
+        Etablissement structureDB = new Etablissement();
 
         structureDB.setId(structureDto.getId());
         structureDB.setNom(structureDto.getNom());

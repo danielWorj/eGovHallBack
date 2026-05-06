@@ -10,7 +10,7 @@ import java.time.LocalDate;
 @Entity
 @Table
 @Data
-public class Structure {
+public class Etablissement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
@@ -25,4 +25,8 @@ public class Structure {
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
     private TypeStructure type ;
+
+    //1- ADMINISTRATION
+    //2- HOPITAL
+    //3- MAIRIE
 }

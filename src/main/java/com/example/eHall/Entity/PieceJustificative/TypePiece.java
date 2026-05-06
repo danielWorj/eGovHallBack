@@ -1,6 +1,6 @@
 package com.example.eHall.Entity.PieceJustificative;
 
-import com.example.eHall.Entity.Domaine.Structure;
+import com.example.eHall.Entity.Domaine.Etablissement;
 import com.example.eHall.Entity.Utilisateur.StatutUser;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -17,7 +17,7 @@ public class TypePiece {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
-    private Structure structure ;
+    private Etablissement structure ;
 
 
 }

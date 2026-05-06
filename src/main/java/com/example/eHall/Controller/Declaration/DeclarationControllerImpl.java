@@ -4,7 +4,7 @@ import com.example.eHall.Dto.Declaration.DeclarationDto;
 import com.example.eHall.Entity.Acte.Declaration;
 import com.example.eHall.Entity.Acte.PieceJointeDeclaration;
 import com.example.eHall.Entity.Acte.TypePieceDeclaration;
-import com.example.eHall.Entity.Domaine.Structure;
+import com.example.eHall.Entity.Domaine.Etablissement;
 import com.example.eHall.Entity.Server.ServerReponse;
 import com.example.eHall.Entity.Utilisateur.Parent;
 import com.example.eHall.Repository.Acte.DeclarationRepository;
@@ -63,7 +63,7 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
             // 1. Désérialisation du DTO
             DeclarationDto declarationDto = this.objectMapper.readValue(declaration, DeclarationDto.class);
             // Recuperation d ela structure
-            Structure structure = this.structureRepository.findById(declarationDto.getStructure()).orElse(null);
+            Etablissement structure = this.structureRepository.findById(declarationDto.getStructure()).orElse(null);
             // 2. Création du Parent
             Parent parentDB = new Parent();
             parentDB.setNom(declarationDto.getNomParent());

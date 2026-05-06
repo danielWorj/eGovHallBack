@@ -1,7 +1,9 @@
 package com.example.eHall.Controller.Utilisateur;
 
+import com.example.eHall.Dto.Utilisateur.LoginDTO;
 import com.example.eHall.Dto.Utilisateur.UtilisateurDto;
 import com.example.eHall.Entity.Server.ServerReponse;
+import com.example.eHall.Entity.Utilisateur.BasicAuthData;
 import com.example.eHall.Entity.Utilisateur.Utilisateur;
 import com.example.eHall.Repository.Domaine.StructureRepository;
 import com.example.eHall.Repository.Utilisateur.RoleUserRepository;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Controller;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
+import java.util.Objects;
 
 @Controller
 public class UtilisateurControllerImpl implements UtilisateurControllerInt {
@@ -41,9 +44,22 @@ public class UtilisateurControllerImpl implements UtilisateurControllerInt {
         utilisateurDB.setRoleUser(this.roleUserRepository.findById(utilisateurDto.getRoleUser()).orElse(null));
         utilisateurDB.setStatutUser(this.statutUserRepository.findById(utilisateurDto.getStatutUser()).orElse(null));
 
-        utilisateurDB.setPassword_hash(utilisateurDto.getPassword_hash());
+        utilisateurDB.setPassword(utilisateurDto.getPassword_hash());
+
+        this.utilisateurRepository.save(utilisateurDB);
 
         return ResponseEntity.ok(new ServerReponse("CREATION USER : success", true));
+    }
+
+    @Override
+    public ResponseEntity<BasicAuthData> loginUser(String user) {
+        System.out.println("Le user est : " + user);
+        LoginDTO loginDTO  = this.objectMapper.readValue(user, LoginDTO.class);
+
+        Utilisateur utilisateur = this.utilisateurRepository.findByEmailAndPassword(loginDTO.getEmail(), loginDTO.getPassword());
+        System.out.println("Le nom de l'utilisateur est : " + utilisateur.getNom());
+
+        return ResponseEntity.ok(new BasicAuthData(utilisateur.getId(), utilisateur.getRoleUser().getId()));
     }
 
 

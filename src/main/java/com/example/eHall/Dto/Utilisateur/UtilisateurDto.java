@@ -1,6 +1,5 @@
 package com.example.eHall.Dto.Utilisateur;
 
-import com.example.eHall.Entity.Domaine.Structure;
 import com.example.eHall.Entity.Utilisateur.RoleUser;
 import com.example.eHall.Entity.Utilisateur.StatutUser;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

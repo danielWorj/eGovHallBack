@@ -1,6 +1,5 @@
 package com.example.eHall.Entity.Document;
 
-import com.example.eHall.Entity.Domaine.Structure;
 import com.example.eHall.Entity.Domaine.TypeStructure;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -15,7 +14,7 @@ public class TypeDocument {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id ;
-    private Structure titre ;
+    private String titre ;
     private LocalDate created ;
 
     @ManyToOne(fetch = FetchType.LAZY)

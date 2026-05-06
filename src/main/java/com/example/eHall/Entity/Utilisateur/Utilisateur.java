@@ -1,6 +1,6 @@
 package com.example.eHall.Entity.Utilisateur;
 
-import com.example.eHall.Entity.Domaine.Structure;
+import com.example.eHall.Entity.Domaine.Etablissement;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -18,7 +18,7 @@ public class Utilisateur {
     private String prenom ;
     private String telephone ;
     private String email ;
-    private String password_hash ;
+    private String password ;
     private LocalDate creation ;
     private LocalDate modification ;
 
@@ -33,7 +33,7 @@ public class Utilisateur {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
-    private Structure structure ;
+    private Etablissement structure ;
 
 
 

@@ -1,18 +1,18 @@
 package com.example.eHall.Controller.Utilisateur;
 
 import com.example.eHall.Entity.Server.ServerReponse;
+import com.example.eHall.Entity.Utilisateur.BasicAuthData;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
-@RequestMapping("/api/user")
+@RequestMapping("/eHall/api/auth")
 @CrossOrigin("*")
 public interface UtilisateurControllerInt {
     //
     @PostMapping("/create")
-    ResponseEntity<ServerReponse> createUser(@Param("user") String user);
+    ResponseEntity<ServerReponse> createUser(@RequestParam("user") String user);
+    @PostMapping("/login")
+    ResponseEntity<BasicAuthData> loginUser(@RequestParam("auth") String user);
 
 }

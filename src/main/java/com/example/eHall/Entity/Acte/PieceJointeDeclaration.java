@@ -1,6 +1,5 @@
 package com.example.eHall.Entity.Acte;
 
-import com.example.eHall.Entity.Domaine.Structure;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
