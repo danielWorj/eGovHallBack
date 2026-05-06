@@ -17,5 +17,5 @@ public class RoleUser {
     //1- ADMIN
     //2- AGENT HOPITAL
     //3- AGENT MAIRIE
-    //4- PARENT
+    //4- CITOYEN
 }

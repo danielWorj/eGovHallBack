@@ -20,6 +20,7 @@ public class Structure {
     private String email ;
     private Boolean actif ;
     private LocalDate creation;
+    private String code ; //code la structure
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
