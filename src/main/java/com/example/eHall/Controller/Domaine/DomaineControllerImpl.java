@@ -28,6 +28,11 @@ public class DomaineControllerImpl implements DomaineControllerInt{
     }
 
     @Override
+    public ResponseEntity<Etablissement> findStructureById(Integer id) {
+        return ResponseEntity.ok(this.structureRepository.findById(id).orElse(null));
+    }
+
+    @Override
     public ResponseEntity<ServerReponse> createStructure(String structure) {
         StructureDto structureDto = this.objectMapper.readValue(structure, StructureDto.class);
 

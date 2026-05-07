@@ -9,11 +9,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequestMapping("/api/domaine")
+@RequestMapping("/eHall/api/domaine")
 @CrossOrigin("*")
 public interface DomaineControllerInt {
     @GetMapping("/all")
     ResponseEntity<List<Etablissement>> findAllStructure();
+    @GetMapping("/byId/{id}")
+    ResponseEntity<Etablissement> findStructureById(@PathVariable Integer id);
     @PostMapping("/create")
     ResponseEntity<ServerReponse> createStructure(@Param("structure") String structure);
     @PostMapping("/update")

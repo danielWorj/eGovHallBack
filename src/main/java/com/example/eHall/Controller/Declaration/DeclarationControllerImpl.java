@@ -3,6 +3,8 @@ package com.example.eHall.Controller.Declaration;
 import com.example.eHall.Dto.Declaration.DeclarationDto;
 import com.example.eHall.Entity.Acte.Declaration;
 import com.example.eHall.Entity.Acte.PieceJointeDeclaration;
+import com.example.eHall.Entity.Enfant.Enfant;
+import com.example.eHall.Entity.Enfant.Sexe;
 import com.example.eHall.Entity.Acte.TypePieceDeclaration;
 import com.example.eHall.Entity.Domaine.Etablissement;
 import com.example.eHall.Entity.Server.ServerReponse;
@@ -11,7 +13,10 @@ import com.example.eHall.Repository.Acte.DeclarationRepository;
 import com.example.eHall.Repository.Acte.PieceJointeDeclarationRepository;
 import com.example.eHall.Repository.Acte.TypePieceJointeDeclarationRepository;
 import com.example.eHall.Repository.Domaine.StructureRepository;
+import com.example.eHall.Repository.Enfant.EnfantRepository;
+import com.example.eHall.Repository.Enfant.SexeRepository;
 import com.example.eHall.Repository.Utilisateur.ParentRepository;
+import com.example.eHall.Service.CloudinaryService;
 import com.example.eHall.Service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +25,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +32,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Controller
@@ -52,45 +57,91 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
 
     @Autowired
     private ParentRepository parentRepository;
+    @Autowired
+    private EnfantRepository enfantRepository;
+    @Autowired
+    private SexeRepository sexeRepository;
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     @Autowired
     private EmailService emailService;
 
     @Override
+    public ResponseEntity<List<Declaration>> findDeclaration() {
+        return ResponseEntity.ok(this.declarationRepository.findAll());
+    }
+
+    @Override
+    public ResponseEntity<List<Declaration>> findDeclarationByEtablissement(Integer id) {
+        return ResponseEntity.ok(this.declarationRepository.findByStructure(
+                this.structureRepository.findById(id).orElse(null)
+        ));
+    }
+
+    @Override
     public ResponseEntity<ServerReponse> createDeclaration(String declaration, MultipartFile[] fichiers) {
         try {
             // 1. Désérialisation du DTO
             DeclarationDto declarationDto = this.objectMapper.readValue(declaration, DeclarationDto.class);
-            // Recuperation d ela structure
-            Etablissement structure = this.structureRepository.findById(declarationDto.getStructure()).orElse(null);
-            // 2. Création du Parent
-            Parent parentDB = new Parent();
-            parentDB.setNom(declarationDto.getNomParent());
-            parentDB.setPrenom(declarationDto.getPrenomParent());
-            parentDB.setTelephone(declarationDto.getTelephone());
-            parentDB.setEmail(declarationDto.getEmail());
-            parentDB.setStatus(false);
-            parentDB.setCreation(LocalDate.now());
-            parentDB.setModification(LocalDate.now());
-            String password = "PDE" + declarationDto.getNomParent() + declarationDto.getPrenomParent() + "XXX";
-            parentDB.setPassword_hash(password);
 
-            Parent parentCreated = this.parentRepository.save(parentDB);
+            // 2. Récupération de la structure
+            Etablissement structure = this.structureRepository
+                    .findById(declarationDto.getStructure())
+                    .orElse(null);
+            if (structure == null) {
+                return ResponseEntity.badRequest()
+                        .body(new ServerReponse("Structure introuvable", false));
+            }
 
-            // 3. Création de la Déclaration
+            // 3. Récupération du Sexe
+            Sexe sexe = this.sexeRepository
+                    .findById(declarationDto.getSexe())
+                    .orElse(null);
+            if (sexe == null) {
+                return ResponseEntity.badRequest()
+                        .body(new ServerReponse("Sexe introuvable", false));
+            }
+
+            // 4. Création de l'Enfant
+            Enfant enfant = new Enfant();
+            enfant.setNom(declarationDto.getNomEnfant());
+            enfant.setPrenom(declarationDto.getPrenomEnfant());
+            enfant.setSexe(sexe);
+            enfant.setDateNaissance(LocalDate.parse(declarationDto.getDateNaissance()));
+            enfant.setLieuNaissance(declarationDto.getLieuNaissance());
+
+            Enfant enfantSaved = this.enfantRepository.save(enfant);
+
+            // 5. Création de la Mère
+            Parent mere = new Parent();
+            mere.setNom(declarationDto.getNomParent());
+            mere.setPrenom(declarationDto.getPrenomParent());
+            mere.setTelephone(declarationDto.getTelephone());
+            mere.setEmail(declarationDto.getEmail());
+            mere.setStatus(false);
+            mere.setCreation(LocalDate.now());
+            mere.setModification(LocalDate.now());
+            String password = "PDE" + declarationDto.getNomParent()
+                    + declarationDto.getPrenomParent() + "XXX";
+            mere.setPassword_hash(password);
+
+            Parent mereSaved = this.parentRepository.save(mere);
+
+            // 6. Création de la Déclaration
             Declaration declarationDB = new Declaration();
-            declarationDB.setNomEnfant(declarationDto.getNomEnfant());
-            declarationDB.setParent(parentCreated);
+            declarationDB.setDate(LocalDate.now());
             declarationDB.setStructure(structure);
+            declarationDB.setEnfant(enfantSaved);
+            declarationDB.setMere(mereSaved);
 
             Declaration declarationSaved = this.declarationRepository.save(declarationDB);
 
-            // 4. Traitement des pièces justificatives
+            // 7. Traitement des pièces justificatives
             if (fichiers != null && fichiers.length > 0) {
                 List<Integer> typeIds = declarationDto.getTypesPiecesJointes();
 
-                // Vérification cohérence nombre de fichiers / nombre de types
                 if (typeIds == null || typeIds.size() != fichiers.length) {
                     return ResponseEntity.badRequest().body(
                             new ServerReponse(
@@ -101,7 +152,6 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
                     );
                 }
 
-                // Création du dossier de stockage si inexistant
                 Path uploadPath = Paths.get(uploadDir);
                 if (!Files.exists(uploadPath)) {
                     Files.createDirectories(uploadPath);
@@ -113,11 +163,8 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
                     MultipartFile fichier = fichiers[i];
                     Integer typeId = typeIds.get(i);
 
-                    if (fichier.isEmpty()) {
-                        continue; // On ignore les fichiers vides
-                    }
+                    if (fichier.isEmpty()) continue;
 
-                    // Récupération du type de pièce
                     TypePieceDeclaration typePiece = this.typePieceJointeDeclarationRepository
                             .findById(typeId)
                             .orElse(null);
@@ -128,51 +175,53 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
                         );
                     }
 
-                    // Génération d'un nom de fichier unique pour éviter les collisions
-                    String extension = getExtension(fichier.getOriginalFilename());
-                    String nomFichierUnique = UUID.randomUUID().toString() + extension;
-                    Path cheminComplet = uploadPath.resolve(nomFichierUnique);
+//                    String extension = getExtension(fichier.getOriginalFilename());
+//                    String nomFichierUnique = UUID.randomUUID().toString() + extension;
+//                    Path cheminComplet = uploadPath.resolve(nomFichierUnique);
+//                    fichier.transferTo(cheminComplet.toFile());
 
-                    // Sauvegarde physique du fichier
-                    fichier.transferTo(cheminComplet.toFile());
-
-                    // Création de l'entité PieceJointeDeclaration
                     PieceJointeDeclaration piece = new PieceJointeDeclaration();
+
+
+                    Map result = this.cloudinaryService.upload(fichier);
+                    piece.setChemin(result.get("secure_url").toString());
+                    System.out.println("media enregistre sur cloudinary avec url: "+ result.get("secure_url").toString());
+
                     piece.setDeclaration(declarationSaved);
                     piece.setType(typePiece);
-                    piece.setChemin(nomFichierUnique);
 
                     piecesJointes.add(piece);
                 }
 
-                // Sauvegarde en base de toutes les pièces jointes
                 this.pieceJointeDeclarationRepository.saveAll(piecesJointes);
-
-                //Envoi du mail a la structure: Hopital
-                this.emailService.sendSimpleEmail(
-                        structure.getEmail(),
-                        "Confirmation de votre déclaration",
-                        "Bonjour " + structure.getNom() + ",\n\n" +
-                                "Votre déclaration pour l'enfant " + declarationSaved.getNomEnfant() + " a été créée avec succès.\n" +
-                                "Nous vous reviendrons en cas de besoin.\n\n" +
-                                "Cordialement,\n" +
-                                "L'équipe eHall"
-                );
-
-                //Envoie du mail au parent
-                this.emailService.sendSimpleEmail(
-                        parentCreated.getEmail(),
-                        "Confirmation de votre déclaration",
-                        "Bonjour " + parentCreated.getPrenom() + " " + parentCreated.getNom() + ",\n\n" +
-                                "Votre déclaration pour l'enfant " + declarationSaved.getNomEnfant() + " a été recu avec succès dans nos services.\n" +
-                                "De ce fait nous lancons immediatement l'etablissement de l'acte de naissance et la verification de vos pieces justificatives.\n" +
-                                "Si tout est en ordre, votre acte de naissance sera établi et vous serez informé pour le paiement des frais.\n" +
-                                "En cas de besoin d'informations supplémentaires ou de documents complémentaires, nous vous contacterons rapidement.\n\n" +
-                                "Pour suivre l'evolution des traitements de votre déclaration, vous pouvez vous connecter à votre espace personnel sur notre plateforme eHall.\n" +
-                                "Cordialement,\n" +
-                                "L'équipe eHall"
-                );
             }
+
+            // 8. Envoi des emails
+            this.emailService.sendSimpleEmail(
+                    structure.getEmail(),
+                    "Nouvelle déclaration de naissance",
+                    "Bonjour " + structure.getNom() + ",\n\n" +
+                            "Une nouvelle déclaration pour l'enfant " +
+                            enfantSaved.getPrenom() + " " + enfantSaved.getNom() +
+                            " a été créée avec succès.\n" +
+                            "Nous vous reviendrons en cas de besoin.\n\n" +
+                            "Cordialement,\nL'équipe eHall"
+            );
+
+            this.emailService.sendSimpleEmail(
+                    mereSaved.getEmail(),
+                    "Confirmation de votre déclaration",
+                    "Bonjour " + mereSaved.getPrenom() + " " + mereSaved.getNom() + ",\n\n" +
+                            "Votre déclaration pour l'enfant " +
+                            enfantSaved.getPrenom() + " " + enfantSaved.getNom() +
+                            " a été reçue avec succès dans nos services.\n" +
+                            "De ce fait nous lançons immédiatement l'établissement de l'acte de naissance " +
+                            "et la vérification de vos pièces justificatives.\n" +
+                            "Si tout est en ordre, votre acte de naissance sera établi et vous serez informé pour le paiement des frais.\n" +
+                            "En cas de besoin d'informations supplémentaires, nous vous contacterons rapidement.\n\n" +
+                            "Pour suivre l'évolution du traitement, connectez-vous à votre espace personnel sur eHall.\n\n" +
+                            "Cordialement,\nL'équipe eHall"
+            );
 
             return ResponseEntity.ok(new ServerReponse("CREATION DECLARATION : SUCCESS", true));
 

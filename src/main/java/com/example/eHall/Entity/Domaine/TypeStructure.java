@@ -11,4 +11,5 @@ public class TypeStructure {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id ;
     private String nom ;
+    private String description ;
 }
