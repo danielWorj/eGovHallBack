@@ -72,6 +72,13 @@
 			<artifactId>spring-boot-starter-data-jdbc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+        <!--	ItextPdf	-->
+		<dependency>
+			<groupId>com.itextpdf</groupId>
+			<artifactId>itext7-core</artifactId>
+			<version>7.2.5</version>
+			<type>pom</type>
+		</dependency>
 		<!-- cloudinary dependencies -->
 		<dependency>
 			<groupId>com.cloudinary</groupId>

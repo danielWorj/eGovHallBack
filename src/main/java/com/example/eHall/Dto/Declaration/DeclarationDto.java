@@ -1,6 +1,8 @@
 package com.example.eHall.Dto.Declaration;
 
 import lombok.Data;
+
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -20,6 +22,9 @@ public class DeclarationDto {
     private String telephone;
     private String email;
     private String localisation;
+    private String profession;
+    private String dateNaissanceM ;
+    private String lieuNaissanceM ;
 
     // Les champs de la structure
     private Integer hopital;

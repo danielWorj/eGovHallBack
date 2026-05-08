@@ -25,6 +25,10 @@ public class ActeDto {
     private String prenomPere ;
     private String telephonePere ;
     private String emailPere ;
+    private String profession ;
+    private String domicile ;
+    private String dateNaissance ;
+    private String lieuNaissance ;
 
     // Liste des types de pièces jointes (IDs des TypePieceDeclaration)
     // Les fichiers sont transmis séparément via MultipartFile[]

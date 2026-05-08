@@ -53,4 +53,10 @@ public interface DeclarationControllerInt {
             @RequestPart("acte") String acte,
             @RequestPart(value = "fichiers", required = false) MultipartFile[] fichiers
     );
+
+    @GetMapping("/acte/download/{id}")
+    ResponseEntity<byte[]> downloadActeNaissance(@PathVariable Integer id);
+
+
+
 }

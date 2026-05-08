@@ -21,6 +21,10 @@ public class Parent {
     private LocalDate creation ;
     private LocalDate modification ;
     private Boolean status ;
+    private String profession ;
+    private String domicile ;
+    private LocalDate dateNaissance ;
+    private String lieuNaissance ;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})

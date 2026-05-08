@@ -20,6 +20,7 @@ import com.example.eHall.Repository.Enfant.SexeRepository;
 import com.example.eHall.Repository.Utilisateur.ParentRepository;
 import com.example.eHall.Repository.Utilisateur.RoleUserRepository;
 import com.example.eHall.Repository.Utilisateur.StatutUserRepository;
+import com.example.eHall.Service.ActeService;
 import com.example.eHall.Service.CloudinaryService;
 import com.example.eHall.Service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -58,6 +64,7 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
     @Autowired private StatutUserRepository statutUserRepository;
     @Autowired private CloudinaryService               cloudinaryService;
     @Autowired private EmailService                    emailService;
+    @Autowired private ActeService acteService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -112,6 +119,10 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
             mere.setEmail(declarationDto.getEmail());
             mere.setStatus(false);
             mere.setCreation(LocalDate.now());
+            mere.setProfession(declarationDto.getProfession());
+            mere.setDateNaissance(LocalDate.parse(declarationDto.getDateNaissanceM()));
+            mere.setLieuNaissance(declarationDto.getLieuNaissanceM());
+            mere.setDomicile(declarationDto.getLocalisation());
             mere.setModification(LocalDate.now());
             mere.setRoleUser(this.roleUserRepository.findById(4).orElse(null));
             mere.setPassword_hash("PDE" + declarationDto.getNomParent() + declarationDto.getPrenomParent() + "XXX");
@@ -197,6 +208,10 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
             pere.setStatus(false);
             pere.setCreation(LocalDate.now());
             pere.setModification(LocalDate.now());
+            pere.setDateNaissance(LocalDate.parse(acteDto.getDateNaissance()));
+            pere.setLieuNaissance(acteDto.getLieuNaissance());
+            pere.setDomicile(acteDto.getDomicile());
+            pere.setProfession(acteDto.getProfession());
             pere.setPassword_hash("PDE" + acteDto.getNomPere() + acteDto.getPrenomPere() + "XXX");
             Parent pereSaved = this.parentRepository.save(pere);
 
@@ -269,9 +284,11 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
                     "CREATION ACTE NAISSANCE : SUCCESS — N° " + numeroActe, true));
 
         } catch (IOException e) {
+            e.printStackTrace();
             return ResponseEntity.internalServerError()
                     .body(new ServerReponse("Erreur fichiers : " + e.getMessage(), false));
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.internalServerError()
                     .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
         }
@@ -345,6 +362,34 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
+        }
+    }
+
+    @Override
+    public ResponseEntity<byte[]> downloadActeNaissance(Integer id) {
+        try {
+            ActeNaissance acte = this.acteNaissanceRepository.findById(id).orElse(null);
+            if (acte == null)
+                return ResponseEntity.notFound().build();
+
+            String cheminPdf = this.acteService.generer(acte);
+
+            byte[] pdfBytes = Files.readAllBytes(Paths.get(cheminPdf));
+
+            String nomFichier = "acte_naissance_" + acte.getNumeroActe() + ".pdf";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", nomFichier);
+            headers.setContentLength(pdfBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
         }
     }
 
