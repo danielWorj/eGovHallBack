@@ -1,21 +1,25 @@
 package com.example.eHall.Controller.Declaration;
 
+import com.example.eHall.Dto.Declaration.ActeDto;
 import com.example.eHall.Dto.Declaration.DeclarationDto;
-import com.example.eHall.Entity.Acte.Declaration;
-import com.example.eHall.Entity.Acte.PieceJointeDeclaration;
+import com.example.eHall.Entity.Acte.*;
+import com.example.eHall.Entity.Domaine.Hopital;
+import com.example.eHall.Entity.Domaine.Mairie;
 import com.example.eHall.Entity.Enfant.Enfant;
 import com.example.eHall.Entity.Enfant.Sexe;
-import com.example.eHall.Entity.Acte.TypePieceDeclaration;
 import com.example.eHall.Entity.Domaine.Etablissement;
 import com.example.eHall.Entity.Server.ServerReponse;
 import com.example.eHall.Entity.Utilisateur.Parent;
-import com.example.eHall.Repository.Acte.DeclarationRepository;
-import com.example.eHall.Repository.Acte.PieceJointeDeclarationRepository;
-import com.example.eHall.Repository.Acte.TypePieceJointeDeclarationRepository;
+import com.example.eHall.Repository.Acte.*;
+import com.example.eHall.Repository.Domaine.HopitalRepository;
+import com.example.eHall.Repository.Domaine.MairieRepository;
+import com.example.eHall.Repository.Domaine.StructureHRepository;
 import com.example.eHall.Repository.Domaine.StructureRepository;
 import com.example.eHall.Repository.Enfant.EnfantRepository;
 import com.example.eHall.Repository.Enfant.SexeRepository;
 import com.example.eHall.Repository.Utilisateur.ParentRepository;
+import com.example.eHall.Repository.Utilisateur.RoleUserRepository;
+import com.example.eHall.Repository.Utilisateur.StatutUserRepository;
 import com.example.eHall.Service.CloudinaryService;
 import com.example.eHall.Service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,83 +39,72 @@ import java.util.UUID;
 @Controller
 public class DeclarationControllerImpl implements DeclarationControllerInt {
 
-    // Dossier de sauvegarde des fichiers (configurable dans application.properties)
-    // Valeur par défaut : "templates/file/"
     @Value("${app.upload.dir:templates/file/}")
     private String uploadDir;
 
-    @Autowired
-    private DeclarationRepository declarationRepository;
-
-    @Autowired
-    private PieceJointeDeclarationRepository pieceJointeDeclarationRepository;
-
-    @Autowired
-    private TypePieceJointeDeclarationRepository typePieceJointeDeclarationRepository;
-
-    @Autowired
-    private StructureRepository structureRepository;
-
-    @Autowired
-    private ParentRepository parentRepository;
-    @Autowired
-    private EnfantRepository enfantRepository;
-    @Autowired
-    private SexeRepository sexeRepository;
-    @Autowired
-    private CloudinaryService cloudinaryService;
+    @Autowired private DeclarationRepository           declarationRepository;
+    @Autowired private ActeNaissanceRepository         acteNaissanceRepository;
+    @Autowired private PieceJointeDeclarationRepository pieceJointeDeclarationRepository;
+    @Autowired private TypePieceJointeDeclarationRepository typePieceJointeDeclarationRepository;
+    @Autowired private PieceJointeActeRepository       pieceJointeActeRepository;
+    @Autowired private StructureRepository             structureRepository;
+    @Autowired private StructureHRepository            structureHRepository;
+    @Autowired private MairieRepository                mairieRepository;
+    @Autowired private HopitalRepository               hopitalRepository;
+    @Autowired private ParentRepository                parentRepository;
+    @Autowired private EnfantRepository                enfantRepository;
+    @Autowired private SexeRepository                  sexeRepository;
+    @Autowired private RoleUserRepository roleUserRepository;
+    @Autowired private StatutUserRepository statutUserRepository;
+    @Autowired private CloudinaryService               cloudinaryService;
+    @Autowired private EmailService                    emailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    @Autowired
-    private EmailService emailService;
 
+    // ── findDeclaration ───────────────────────────────────────────────────
     @Override
     public ResponseEntity<List<Declaration>> findDeclaration() {
         return ResponseEntity.ok(this.declarationRepository.findAll());
     }
 
     @Override
-    public ResponseEntity<List<Declaration>> findDeclarationByEtablissement(Integer id) {
-        return ResponseEntity.ok(this.declarationRepository.findByStructure(
-                this.structureRepository.findById(id).orElse(null)
-        ));
+    public ResponseEntity<List<Declaration>> findDeclarationByHopital(Integer id) {
+        return ResponseEntity.ok(this.declarationRepository.findByHopital(
+                this.hopitalRepository.findById(id).orElse(null)));
     }
 
     @Override
+    public ResponseEntity<List<Declaration>> findDeclarationByMairie(Integer id) {
+        return ResponseEntity.ok(this.declarationRepository.findByMairie(
+                this.mairieRepository.findById(id).orElse(null)));
+    }
+
+    // ── createDeclaration ─────────────────────────────────────────────────
+    @Override
     public ResponseEntity<ServerReponse> createDeclaration(String declaration, MultipartFile[] fichiers) {
         try {
-            // 1. Désérialisation du DTO
             DeclarationDto declarationDto = this.objectMapper.readValue(declaration, DeclarationDto.class);
 
-            // 2. Récupération de la structure
-            Etablissement structure = this.structureRepository
-                    .findById(declarationDto.getStructure())
-                    .orElse(null);
-            if (structure == null) {
-                return ResponseEntity.badRequest()
-                        .body(new ServerReponse("Structure introuvable", false));
-            }
+            Hopital hopital = this.hopitalRepository.findById(declarationDto.getHopital()).orElse(null);
+            Mairie  mairie  = this.mairieRepository.findById(declarationDto.getMairie()).orElse(null);
 
-            // 3. Récupération du Sexe
-            Sexe sexe = this.sexeRepository
-                    .findById(declarationDto.getSexe())
-                    .orElse(null);
-            if (sexe == null) {
-                return ResponseEntity.badRequest()
-                        .body(new ServerReponse("Sexe introuvable", false));
-            }
+            if (hopital == null)
+                return ResponseEntity.badRequest().body(new ServerReponse("Hopital introuvable", false));
+            if (mairie == null)
+                return ResponseEntity.badRequest().body(new ServerReponse("Mairie introuvable", false));
 
-            // 4. Création de l'Enfant
+            Sexe sexe = this.sexeRepository.findById(declarationDto.getSexe()).orElse(null);
+            if (sexe == null)
+                return ResponseEntity.badRequest().body(new ServerReponse("Sexe introuvable", false));
+
             Enfant enfant = new Enfant();
             enfant.setNom(declarationDto.getNomEnfant());
             enfant.setPrenom(declarationDto.getPrenomEnfant());
             enfant.setSexe(sexe);
             enfant.setDateNaissance(LocalDate.parse(declarationDto.getDateNaissance()));
             enfant.setLieuNaissance(declarationDto.getLieuNaissance());
-
             Enfant enfantSaved = this.enfantRepository.save(enfant);
 
-            // 5. Création de la Mère
             Parent mere = new Parent();
             mere.setNom(declarationDto.getNomParent());
             mere.setPrenom(declarationDto.getPrenomParent());
@@ -123,127 +113,244 @@ public class DeclarationControllerImpl implements DeclarationControllerInt {
             mere.setStatus(false);
             mere.setCreation(LocalDate.now());
             mere.setModification(LocalDate.now());
-            String password = "PDE" + declarationDto.getNomParent()
-                    + declarationDto.getPrenomParent() + "XXX";
-            mere.setPassword_hash(password);
-
+            mere.setRoleUser(this.roleUserRepository.findById(4).orElse(null));
+            mere.setPassword_hash("PDE" + declarationDto.getNomParent() + declarationDto.getPrenomParent() + "XXX");
             Parent mereSaved = this.parentRepository.save(mere);
 
-            // 6. Création de la Déclaration
             Declaration declarationDB = new Declaration();
             declarationDB.setDate(LocalDate.now());
-            declarationDB.setStructure(structure);
+            declarationDB.setHopital(hopital);
+            declarationDB.setMairie(mairie);
             declarationDB.setEnfant(enfantSaved);
             declarationDB.setMere(mereSaved);
-
             Declaration declarationSaved = this.declarationRepository.save(declarationDB);
 
-            // 7. Traitement des pièces justificatives
             if (fichiers != null && fichiers.length > 0) {
                 List<Integer> typeIds = declarationDto.getTypesPiecesJointes();
+                if (typeIds == null || typeIds.size() != fichiers.length)
+                    return ResponseEntity.badRequest().body(new ServerReponse(
+                            "Nombre de types != nombre de fichiers", false));
 
-                if (typeIds == null || typeIds.size() != fichiers.length) {
-                    return ResponseEntity.badRequest().body(
-                            new ServerReponse(
-                                    "Le nombre de types de pièces (" + (typeIds == null ? 0 : typeIds.size()) +
-                                            ") ne correspond pas au nombre de fichiers (" + fichiers.length + ")",
-                                    false
-                            )
-                    );
-                }
-
-                Path uploadPath = Paths.get(uploadDir);
-                if (!Files.exists(uploadPath)) {
-                    Files.createDirectories(uploadPath);
-                }
-
-                List<PieceJointeDeclaration> piecesJointes = new ArrayList<>();
-
+                List<PieceJointeDeclaration> pieces = new ArrayList<>();
                 for (int i = 0; i < fichiers.length; i++) {
-                    MultipartFile fichier = fichiers[i];
-                    Integer typeId = typeIds.get(i);
-
-                    if (fichier.isEmpty()) continue;
-
-                    TypePieceDeclaration typePiece = this.typePieceJointeDeclarationRepository
-                            .findById(typeId)
-                            .orElse(null);
-
-                    if (typePiece == null) {
+                    if (fichiers[i].isEmpty()) continue;
+                    TypePieceDeclaration type = this.typePieceJointeDeclarationRepository
+                            .findById(typeIds.get(i)).orElse(null);
+                    if (type == null)
                         return ResponseEntity.badRequest().body(
-                                new ServerReponse("Type de pièce introuvable pour l'ID : " + typeId, false)
-                        );
-                    }
+                                new ServerReponse("Type introuvable ID : " + typeIds.get(i), false));
 
-//                    String extension = getExtension(fichier.getOriginalFilename());
-//                    String nomFichierUnique = UUID.randomUUID().toString() + extension;
-//                    Path cheminComplet = uploadPath.resolve(nomFichierUnique);
-//                    fichier.transferTo(cheminComplet.toFile());
-
-                    PieceJointeDeclaration piece = new PieceJointeDeclaration();
-
-
-                    Map result = this.cloudinaryService.upload(fichier);
-                    piece.setChemin(result.get("secure_url").toString());
-                    System.out.println("media enregistre sur cloudinary avec url: "+ result.get("secure_url").toString());
-
-                    piece.setDeclaration(declarationSaved);
-                    piece.setType(typePiece);
-
-                    piecesJointes.add(piece);
+                    Map result = this.cloudinaryService.upload(fichiers[i]);
+                    PieceJointeDeclaration p = new PieceJointeDeclaration();
+                    p.setDeclaration(declarationSaved);
+                    p.setType(type);
+                    p.setChemin(result.get("secure_url").toString());
+                    pieces.add(p);
                 }
-
-                this.pieceJointeDeclarationRepository.saveAll(piecesJointes);
+                this.pieceJointeDeclarationRepository.saveAll(pieces);
             }
-
-            // 8. Envoi des emails
-            this.emailService.sendSimpleEmail(
-                    structure.getEmail(),
-                    "Nouvelle déclaration de naissance",
-                    "Bonjour " + structure.getNom() + ",\n\n" +
-                            "Une nouvelle déclaration pour l'enfant " +
-                            enfantSaved.getPrenom() + " " + enfantSaved.getNom() +
-                            " a été créée avec succès.\n" +
-                            "Nous vous reviendrons en cas de besoin.\n\n" +
-                            "Cordialement,\nL'équipe eHall"
-            );
 
             this.emailService.sendSimpleEmail(
                     mereSaved.getEmail(),
-                    "Confirmation de votre déclaration",
+                    "Déclaration de naissance reçue — eHall",
                     "Bonjour " + mereSaved.getPrenom() + " " + mereSaved.getNom() + ",\n\n" +
-                            "Votre déclaration pour l'enfant " +
-                            enfantSaved.getPrenom() + " " + enfantSaved.getNom() +
-                            " a été reçue avec succès dans nos services.\n" +
-                            "De ce fait nous lançons immédiatement l'établissement de l'acte de naissance " +
-                            "et la vérification de vos pièces justificatives.\n" +
-                            "Si tout est en ordre, votre acte de naissance sera établi et vous serez informé pour le paiement des frais.\n" +
-                            "En cas de besoin d'informations supplémentaires, nous vous contacterons rapidement.\n\n" +
-                            "Pour suivre l'évolution du traitement, connectez-vous à votre espace personnel sur eHall.\n\n" +
-                            "Cordialement,\nL'équipe eHall"
+                            "Votre déclaration pour l'enfant " + enfantSaved.getPrenom() + " " + enfantSaved.getNom() +
+                            " a été reçue avec succès.\n\nCordialement,\nL'équipe eHall"
             );
 
             return ResponseEntity.ok(new ServerReponse("CREATION DECLARATION : SUCCESS", true));
 
         } catch (IOException e) {
-            return ResponseEntity.internalServerError().body(
-                    new ServerReponse("Erreur lors de la sauvegarde des fichiers : " + e.getMessage(), false)
-            );
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur fichiers : " + e.getMessage(), false));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(
-                    new ServerReponse("Erreur inattendue : " + e.getMessage(), false)
-            );
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
         }
     }
 
-    /**
-     * Extrait l'extension d'un nom de fichier.
-     * Retourne ".bin" si aucune extension n'est trouvée.
-     */
-    private String getExtension(String nomFichier) {
-        if (nomFichier == null || !nomFichier.contains(".")) {
-            return ".bin";
+    // ── findAllActeNaissanceByMairie ──────────────────────────────────────
+    @Override
+    public ResponseEntity<List<ActeNaissance>> findAllActeNaissanceByMairie(Integer id) {
+        return ResponseEntity.ok(this.acteNaissanceRepository.findAllActeByMairie(id));
+    }
+
+    // ── creationActeNaissance ─────────────────────────────────────────────
+    @Override
+    public ResponseEntity<ServerReponse> creationActeNaissance(String acte, MultipartFile[] fichiers) {
+        try {
+            ActeDto acteDto = this.objectMapper.readValue(acte, ActeDto.class);
+
+            Declaration declaration = this.declarationRepository
+                    .findById(acteDto.getDeclaration()).orElse(null);
+            if (declaration == null)
+                return ResponseEntity.badRequest().body(
+                        new ServerReponse("Déclaration introuvable ID : " + acteDto.getDeclaration(), false));
+
+            Parent pere = new Parent();
+            pere.setNom(acteDto.getNomPere());
+            pere.setPrenom(acteDto.getPrenomPere());
+            pere.setTelephone(acteDto.getTelephonePere());
+            pere.setEmail(acteDto.getEmailPere());
+            pere.setStatus(false);
+            pere.setCreation(LocalDate.now());
+            pere.setModification(LocalDate.now());
+            pere.setPassword_hash("PDE" + acteDto.getNomPere() + acteDto.getPrenomPere() + "XXX");
+            Parent pereSaved = this.parentRepository.save(pere);
+
+            String numeroActe = LocalDate.now().getYear()
+                    + "-" + declaration.getMairie().getId()
+                    + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+            ActeNaissance acteNaissance = new ActeNaissance();
+            acteNaissance.setNumeroActe(numeroActe);
+            acteNaissance.setDate(LocalDate.now());
+            acteNaissance.setDeclaration(declaration);
+            acteNaissance.setPere(pereSaved);
+            ActeNaissance acteNaissanceCreated = this.acteNaissanceRepository.save(acteNaissance);
+
+            if (fichiers != null && fichiers.length > 0) {
+                List<Integer> typeIds = acteDto.getTypesPiecesJointes();
+                if (typeIds == null || typeIds.size() != fichiers.length)
+                    return ResponseEntity.badRequest().body(new ServerReponse(
+                            "Nombre de types (" + (typeIds == null ? 0 : typeIds.size()) +
+                                    ") != nombre de fichiers (" + fichiers.length + ")", false));
+
+                List<PieceJointeActeNaissance> pieces = new ArrayList<>();
+                for (int i = 0; i < fichiers.length; i++) {
+                    if (fichiers[i].isEmpty()) continue;
+                    TypePieceDeclaration type = this.typePieceJointeDeclarationRepository
+                            .findById(typeIds.get(i)).orElse(null);
+                    if (type == null)
+                        return ResponseEntity.badRequest().body(
+                                new ServerReponse("Type introuvable ID : " + typeIds.get(i), false));
+
+                    Map result = this.cloudinaryService.upload(fichiers[i]);
+                    PieceJointeActeNaissance p = new PieceJointeActeNaissance();
+                    p.setActeNaissance(acteNaissanceCreated);
+                    p.setType(type);
+                    p.setChemin(result.get("secure_url").toString());
+                    pieces.add(p);
+                }
+                this.pieceJointeActeRepository.saveAll(pieces);
+            }
+
+            LocalDate dateRdv    = LocalDate.now().plusDays(10);
+            String rdvFormate    = dateRdv.getDayOfMonth() + "/" + dateRdv.getMonthValue() + "/" + dateRdv.getYear();
+            String prenomEnfant  = declaration.getEnfant().getPrenom();
+            String nomEnfant     = declaration.getEnfant().getNom();
+            String localisation  = declaration.getMairie().getLocalisation() != null
+                    ? declaration.getMairie().getLocalisation() : declaration.getMairie().getNom();
+            Parent mere          = declaration.getMere();
+
+            String corpsEmail =
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                            "  Numéro de l'acte     : " + numeroActe + "\n" +
+                            "  Enfant               : " + prenomEnfant + " " + nomEnfant + "\n" +
+                            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                            "📅 RENDEZ-VOUS : le " + rdvFormate + "\n" +
+                            "📍 Lieu        : " + localisation + "\n\n" +
+                            "Merci de vous présenter muni(e) d'une pièce d'identité valide.\n\n" +
+                            "Cordialement,\nL'équipe eHall";
+
+            this.emailService.sendSimpleEmail(mere.getEmail(),
+                    "✅ Acte de naissance établi — Rendez-vous le " + rdvFormate,
+                    "Bonjour " + mere.getPrenom() + " " + mere.getNom() + ",\n\n" +
+                            "L'acte de naissance de votre enfant a été établi.\n\n" + corpsEmail);
+
+            this.emailService.sendSimpleEmail(pereSaved.getEmail(),
+                    "✅ Acte de naissance établi — Rendez-vous le " + rdvFormate,
+                    "Bonjour " + pereSaved.getPrenom() + " " + pereSaved.getNom() + ",\n\n" +
+                            "L'acte de naissance de votre enfant a été établi.\n\n" + corpsEmail);
+
+            return ResponseEntity.ok(new ServerReponse(
+                    "CREATION ACTE NAISSANCE : SUCCESS — N° " + numeroActe, true));
+
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur fichiers : " + e.getMessage(), false));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
         }
+    }
+
+    // ── updateActeNaissance ───────────────────────────────────────────────
+    @Override
+    public ResponseEntity<ServerReponse> updateActeNaissance(
+            Integer id, String acte, MultipartFile[] fichiers) {
+        try {
+            // 1. Désérialisation
+            ActeDto acteDto = this.objectMapper.readValue(acte, ActeDto.class);
+
+            // 2. Récupération de l'acte existant
+            ActeNaissance acteNaissance = this.acteNaissanceRepository.findById(id).orElse(null);
+            if (acteNaissance == null)
+                return ResponseEntity.badRequest().body(
+                        new ServerReponse("Acte introuvable — ID : " + id, false));
+
+            // 3. Mise à jour du père
+            Parent pere = acteNaissance.getPere();
+            if (pere == null) {
+                // Cas exceptionnel : père non rattaché, on en crée un nouveau
+                pere = new Parent();
+                pere.setCreation(LocalDate.now());
+                pere.setStatus(false);
+                pere.setPassword_hash("PDE" + acteDto.getNomPere() + acteDto.getPrenomPere() + "XXX");
+            }
+            pere.setNom(acteDto.getNomPere());
+            pere.setPrenom(acteDto.getPrenomPere());
+            pere.setTelephone(acteDto.getTelephonePere());
+            pere.setEmail(acteDto.getEmailPere());
+            pere.setModification(LocalDate.now());
+            this.parentRepository.save(pere);
+
+            // 4. Mise à jour de la date de l'acte
+            if (acteDto.getDate() != null) {
+                acteNaissance.setDate(acteDto.getDate());
+            }
+            this.acteNaissanceRepository.save(acteNaissance);
+
+            // 5. Pièces jointes supplémentaires (optionnel)
+            if (fichiers != null && fichiers.length > 0) {
+                List<Integer> typeIds = acteDto.getTypesPiecesJointes();
+                if (typeIds != null && typeIds.size() == fichiers.length) {
+                    Declaration declaration = acteNaissance.getDeclaration();
+                    List<PieceJointeActeNaissance> pieces = new ArrayList<>();
+                    for (int i = 0; i < fichiers.length; i++) {
+                        if (fichiers[i].isEmpty()) continue;
+                        TypePieceDeclaration type = this.typePieceJointeDeclarationRepository
+                                .findById(typeIds.get(i)).orElse(null);
+                        if (type == null) continue;
+
+                        Map result = this.cloudinaryService.upload(fichiers[i]);
+                        PieceJointeActeNaissance p = new PieceJointeActeNaissance();
+                        p.setActeNaissance(acteNaissance);
+                        p.setType(type);
+                        p.setChemin(result.get("secure_url").toString());
+                        pieces.add(p);
+                    }
+                    this.pieceJointeActeRepository.saveAll(pieces);
+                }
+            }
+
+            return ResponseEntity.ok(
+                    new ServerReponse("MISE A JOUR ACTE : SUCCESS — N° " + acteNaissance.getNumeroActe(), true));
+
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur fichiers : " + e.getMessage(), false));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
+        }
+    }
+
+    // ── private helper ────────────────────────────────────────────────────
+    private String getExtension(String nomFichier) {
+        if (nomFichier == null || !nomFichier.contains(".")) return ".bin";
         return nomFichier.substring(nomFichier.lastIndexOf("."));
     }
 }

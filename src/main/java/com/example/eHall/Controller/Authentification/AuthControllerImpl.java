@@ -58,7 +58,7 @@ public class AuthControllerImpl implements AuthControllerInt {
         Utilisateur utilisateur = this.utilisateurRepository.findByEmailAndPassword(loginDTO.getEmail(), loginDTO.getPassword());
         System.out.println("Le nom de l'utilisateur est : " + utilisateur.getNom());
 
-        return ResponseEntity.ok(new BasicAuthData(utilisateur.getId(), utilisateur.getRoleUser().getId() , utilisateur.getStructure().getId()));
+        return ResponseEntity.ok(new BasicAuthData(utilisateur.getId(), utilisateur.getRoleUser().getId() , utilisateur.getStructure() !=null ? utilisateur.getStructure().getId() :0));
     }
 
 

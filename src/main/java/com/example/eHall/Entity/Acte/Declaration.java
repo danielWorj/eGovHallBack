@@ -1,6 +1,9 @@
 package com.example.eHall.Entity.Acte;
 
 import com.example.eHall.Entity.Domaine.Etablissement;
+import com.example.eHall.Entity.Domaine.Hopital;
+import com.example.eHall.Entity.Domaine.Mairie;
+import com.example.eHall.Entity.Domaine.Structure;
 import com.example.eHall.Entity.Enfant.Enfant;
 import com.example.eHall.Entity.PieceJustificative.PieceJustificative;
 import com.example.eHall.Entity.Utilisateur.Parent;
@@ -23,7 +26,11 @@ public class Declaration {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
-    private Etablissement structure ;
+    private Hopital hopital ;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
+    private Mairie mairie ;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})

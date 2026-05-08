@@ -14,3 +14,6 @@ public class TypePieceDeclaration {
     private Integer id;
     private String nom ;
 }
+//CNI
+//PHOTO
+//CERTIFICAT

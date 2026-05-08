@@ -22,7 +22,8 @@ public class DeclarationDto {
     private String localisation;
 
     // Les champs de la structure
-    private Integer structure;
+    private Integer hopital;
+    private Integer mairie;
 
     // Liste des types de pièces jointes (IDs des TypePieceDeclaration)
     // Les fichiers sont transmis séparément via MultipartFile[]
