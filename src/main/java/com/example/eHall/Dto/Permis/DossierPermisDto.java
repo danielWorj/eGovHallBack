@@ -15,7 +15,6 @@ public class DossierPermisDto {
     private String raison ;
 
     // Infos complémentaires demandeur
-    private String raisonSociale; // si personne morale
 
     // Mairie destinataire
     private Integer mairieId;

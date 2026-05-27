@@ -1,6 +1,8 @@
 package com.example.eHall.Controller.Permis;
 
 import com.example.eHall.Entity.PermisBatir.DossierPermisBatir;
+import com.example.eHall.Entity.PermisBatir.PlanExecution;
+import com.example.eHall.Entity.PermisBatir.TypePlanExecution;
 import com.example.eHall.Entity.Server.ServerReponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,7 +51,7 @@ public interface PermisControllerInt {
             @RequestPart(value = "planSituationTerrain", required = false) MultipartFile  planSituationTerrain,
             @RequestPart(value = "cni",                  required = false) MultipartFile  cni,
             @RequestPart(value = "plansExecution",       required = false) MultipartFile[] plansExecution
-    );
+    ) throws Exception;
 
     // ── Mise à jour ───────────────────────────────────────────────────────
 
@@ -71,4 +73,14 @@ public interface PermisControllerInt {
 
     @DeleteMapping("/dossier/delete/{id}")
     ResponseEntity<ServerReponse> deleteDossierPermis(@PathVariable Integer id);
+
+    //PLAN D'EXECEUTION
+
+    @GetMapping("/planExecution/bydossier/{id}")
+    ResponseEntity<List<PlanExecution>> getAllPlanExecutionByDossier(@PathVariable Integer id);
+
+
+    //Type Plan
+    @GetMapping("/typeplan/all")
+    ResponseEntity<List<TypePlanExecution>> getAlLPlanExecution();
 }

@@ -16,6 +16,8 @@ import com.example.eHall.Repository.Permis.TypePlanExecutionRepository;
 import com.example.eHall.Repository.Utilisateur.UtilisateurRepository;
 import com.example.eHall.Service.CloudinaryService;
 import com.example.eHall.Service.EmailService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -31,12 +33,16 @@ import java.util.UUID;
 @Controller
 public class PermisControllerImpl implements PermisControllerInt {
 
+    // ── Logger ────────────────────────────────────────────────────────────
+    private static final Logger log = LoggerFactory.getLogger(PermisControllerImpl.class);
+
     @Autowired private DossierPermisBatirRepository dossierRepository;
     @Autowired private PlanExecutionRepository       planExecutionRepository;
     @Autowired private StatutDossierRepository       statutDossierRepository;
     @Autowired private TypePlanExecutionRepository   typePlanExecutionRepository;
     @Autowired private MairieRepository              mairieRepository;
     @Autowired private UtilisateurRepository         utilisateurRepository;
+
     @Autowired private CloudinaryService             cloudinaryService;
     @Autowired private EmailService                  emailService;
 
@@ -45,33 +51,43 @@ public class PermisControllerImpl implements PermisControllerInt {
     // ── findAll ───────────────────────────────────────────────────────────
     @Override
     public ResponseEntity<List<DossierPermisBatir>> findAll() {
+        log.info("GET /dossier/all");
         return ResponseEntity.ok(this.dossierRepository.findAll());
     }
 
     // ── findAllByMairie ───────────────────────────────────────────────────
     @Override
     public ResponseEntity<List<DossierPermisBatir>> findAllByMairie(Integer id) {
+        log.info("GET /dossier/allbymairie/{}", id);
         Mairie mairie = this.mairieRepository.findById(id).orElse(null);
-        if (mairie == null)
+        if (mairie == null) {
+            log.warn("findAllByMairie → mairie introuvable, id={}", id);
             return ResponseEntity.badRequest().build();
+        }
         return ResponseEntity.ok(this.dossierRepository.findByMairie(mairie));
     }
 
     // ── findAllByUser ─────────────────────────────────────────────────────
     @Override
     public ResponseEntity<List<DossierPermisBatir>> findAllByUser(Integer id) {
+        log.info("GET /dossier/allbyuser/{}", id);
         Utilisateur utilisateur = this.utilisateurRepository.findById(id).orElse(null);
-        if (utilisateur == null)
+        if (utilisateur == null) {
+            log.warn("findAllByUser → utilisateur introuvable, id={}", id);
             return ResponseEntity.badRequest().build();
+        }
         return ResponseEntity.ok(this.dossierRepository.findByDemandeur(utilisateur));
     }
 
     // ── findById ──────────────────────────────────────────────────────────
     @Override
     public ResponseEntity<DossierPermisBatir> findById(Integer id) {
+        log.info("GET /dossier/byId/{}", id);
         DossierPermisBatir dossier = this.dossierRepository.findById(id).orElse(null);
-        if (dossier == null)
+        if (dossier == null) {
+            log.warn("findById → dossier introuvable, id={}", id);
             return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(dossier);
     }
 
@@ -86,11 +102,13 @@ public class PermisControllerImpl implements PermisControllerInt {
             MultipartFile   planMasse,
             MultipartFile   planSituationTerrain,
             MultipartFile   cni,
-            MultipartFile[] plansExecution) {
+            MultipartFile[] plansExecution) throws Exception {
 
-        try {
+        log.info("POST /dossier/create → début création dossier permis");
+
             // 1. Désérialisation du DTO
             DossierPermisDto dto = this.objectMapper.readValue(dossierJson, DossierPermisDto.class);
+            log.debug("createDossierPermis → DTO désérialisé : nom={}, prénom={}", dto.getNom(), dto.getPrenom());
 
             // 2. Recherche du demandeur — si inexistant on le crée
             Utilisateur demandeur = this.utilisateurRepository
@@ -98,6 +116,7 @@ public class PermisControllerImpl implements PermisControllerInt {
                     .orElse(null);
 
             if (demandeur == null) {
+                log.info("createDossierPermis → demandeur inexistant, création en base");
                 demandeur = new Utilisateur();
                 demandeur.setNom(dto.getNom());
                 demandeur.setPrenom(dto.getPrenom());
@@ -105,22 +124,25 @@ public class PermisControllerImpl implements PermisControllerInt {
                 demandeur.setEmail(dto.getEmail());
                 demandeur.setCreation(LocalDate.now());
                 demandeur.setModification(LocalDate.now());
-                // Mot de passe temporaire — à changer à la première connexion
                 demandeur.setPassword("PB-" + dto.getNom() + dto.getPrenom() + "XXX");
                 demandeur = this.utilisateurRepository.save(demandeur);
             }
 
             // 3. Vérification de la mairie
             Mairie mairie = this.mairieRepository.findById(dto.getMairieId()).orElse(null);
-            if (mairie == null)
+            if (mairie == null) {
+                log.warn("createDossierPermis → mairie introuvable, id={}", dto.getMairieId());
                 return ResponseEntity.badRequest()
                         .body(new ServerReponse("Mairie introuvable — ID : " + dto.getMairieId(), false));
+            }
 
-            // 4. Statut initial du dossier (id=1 → SOUMIS, à adapter selon ta table)
+            // 4. Statut initial du dossier (id=1 → SOUMIS)
             StatutDossier statutSoumis = this.statutDossierRepository.findById(1).orElse(null);
-            if (statutSoumis == null)
+            if (statutSoumis == null) {
+                log.error("createDossierPermis → statut SOUMIS (id=1) absent de la base !");
                 return ResponseEntity.internalServerError()
                         .body(new ServerReponse("Statut SOUMIS introuvable en base", false));
+            }
 
             // 5. Génération du numéro de dossier
             String numeroDossier = "PB-" + LocalDate.now().getYear()
@@ -135,36 +157,38 @@ public class PermisControllerImpl implements PermisControllerInt {
             dossier.setDemandeur(demandeur);
             dossier.setMairie(mairie);
             dossier.setRaison(dto.getRaison());
-            dossier.setRaison(dto.getRaisonSociale());
             dossier.setDateInstruction(LocalDate.now().plusDays(45));
-            dossier.setDate(LocalDate.now());
 
             // 7. Upload des pièces justificatives sur Cloudinary
-            if (demandeTimbre       != null && !demandeTimbre.isEmpty())
+            if (demandeTimbre        != null && !demandeTimbre.isEmpty())
                 dossier.setDemandeTimbre(uploadFichier(demandeTimbre));
-            if (certificatUrbanisme != null && !certificatUrbanisme.isEmpty())
+            if (certificatUrbanisme  != null && !certificatUrbanisme.isEmpty())
                 dossier.setCertificatUrbanisme(uploadFichier(certificatUrbanisme));
-            if (certificatPropriete != null && !certificatPropriete.isEmpty())
+            if (certificatPropriete  != null && !certificatPropriete.isEmpty())
                 dossier.setCertificatPropriete(uploadFichier(certificatPropriete));
-            if (devis               != null && !devis.isEmpty())
+            if (devis                != null && !devis.isEmpty())
                 dossier.setDevis(uploadFichier(devis));
-            if (planMasse           != null && !planMasse.isEmpty())
+            if (planMasse            != null && !planMasse.isEmpty())
                 dossier.setPlanMasse(uploadFichier(planMasse));
-            if (planSituationTerrain!= null && !planSituationTerrain.isEmpty())
+            if (planSituationTerrain != null && !planSituationTerrain.isEmpty())
                 dossier.setPlanTerrain(uploadFichier(planSituationTerrain));
-            if (cni                 != null && !cni.isEmpty())
+            if (cni                  != null && !cni.isEmpty())
                 dossier.setCni(uploadFichier(cni));
 
             // 8. Sauvegarde du dossier
             DossierPermisBatir dossierSaved = this.dossierRepository.save(dossier);
+            log.info("createDossierPermis → dossier sauvegardé, numéro={}", numeroDossier);
 
             // 9. Upload et sauvegarde des plans d'exécution
             if (plansExecution != null && plansExecution.length > 0) {
                 List<Integer> typesIds = dto.getTypesPlansIds();
-                if (typesIds == null || typesIds.size() != plansExecution.length)
+                if (typesIds == null || typesIds.size() != plansExecution.length) {
+                    log.warn("createDossierPermis → incohérence plans : {} types vs {} fichiers",
+                            typesIds == null ? 0 : typesIds.size(), plansExecution.length);
                     return ResponseEntity.badRequest().body(new ServerReponse(
                             "Nombre de types de plans (" + (typesIds == null ? 0 : typesIds.size())
                                     + ") != nombre de fichiers plans (" + plansExecution.length + ")", false));
+                }
 
                 List<PlanExecution> plans = new ArrayList<>();
                 for (int i = 0; i < plansExecution.length; i++) {
@@ -172,9 +196,11 @@ public class PermisControllerImpl implements PermisControllerInt {
 
                     TypePlanExecution typePlan = this.typePlanExecutionRepository
                             .findById(typesIds.get(i)).orElse(null);
-                    if (typePlan == null)
+                    if (typePlan == null) {
+                        log.warn("createDossierPermis → TypePlanExecution introuvable, id={}", typesIds.get(i));
                         return ResponseEntity.badRequest().body(new ServerReponse(
                                 "TypePlanExecution introuvable — ID : " + typesIds.get(i), false));
+                    }
 
                     PlanExecution plan = new PlanExecution();
                     plan.setDossier(dossierSaved);
@@ -183,6 +209,7 @@ public class PermisControllerImpl implements PermisControllerInt {
                     plans.add(plan);
                 }
                 this.planExecutionRepository.saveAll(plans);
+                log.info("createDossierPermis → {} plan(s) d'exécution sauvegardé(s)", plans.size());
             }
 
             // 10. Email de confirmation au demandeur
@@ -196,7 +223,7 @@ public class PermisControllerImpl implements PermisControllerInt {
                             "  Date de dépôt     : " + LocalDate.now() + "\n" +
                             "  Mairie compétente : " + mairie.getNom() + "\n" +
                             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-                            "📅 Date limite d'instruction : " + dateLimite + " (45 jours)\n\n" +
+                            "Date limite d'instruction : " + dateLimite + " (45 jours)\n\n" +
                             "Votre dossier est en cours d'examen par la commission compétente.\n" +
                             "Vous serez notifié(e) par email dès qu'une décision sera rendue.\n\n" +
                             "Conservez précieusement votre numéro de dossier pour tout suivi.\n\n" +
@@ -204,19 +231,15 @@ public class PermisControllerImpl implements PermisControllerInt {
 
             this.emailService.sendSimpleEmail(
                     demandeur.getEmail(),
-                    "✅ Dossier permis de bâtir reçu — N° " + numeroDossier,
+                    "Dossier permis de bâtir reçu — N° " + numeroDossier,
                     "Bonjour " + demandeur.getPrenom() + " " + demandeur.getNom() + ",\n\n" +
                             "Votre demande de permis de bâtir a été reçue avec succès.\n\n" + corpsEmail
             );
 
+            //log.info("createDossierPermis → email envoyé à {}", demandeur.getEmail());
             return ResponseEntity.ok(new ServerReponse(
                     "CREATION DOSSIER PERMIS : SUCCESS — N° " + numeroDossier, true));
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
-        }
     }
 
     // ── updateDossierPermis ───────────────────────────────────────────────
@@ -233,19 +256,21 @@ public class PermisControllerImpl implements PermisControllerInt {
             MultipartFile   cni,
             MultipartFile[] plansExecution) {
 
+        log.info("PUT /dossier/update/{}", id);
         try {
             // 1. Récupération du dossier existant
             DossierPermisBatir dossier = this.dossierRepository.findById(id).orElse(null);
-            if (dossier == null)
+            if (dossier == null) {
+                log.warn("updateDossierPermis → dossier introuvable, id={}", id);
                 return ResponseEntity.badRequest()
                         .body(new ServerReponse("Dossier introuvable — ID : " + id, false));
+            }
 
             // 2. Désérialisation
             DossierPermisDto dto = this.objectMapper.readValue(dossierJson, DossierPermisDto.class);
 
             // 3. Mise à jour des champs texte
-            if (dto.getRaison()        != null) dossier.setRaison(dto.getRaison());
-            if (dto.getRaisonSociale() != null) dossier.setRaison(dto.getRaisonSociale());
+            if (dto.getRaison() != null) dossier.setRaison(dto.getRaison());
             dossier.setDateModification(LocalDate.now());
 
             // 4. Remplacement des fichiers si de nouveaux sont fournis
@@ -280,13 +305,17 @@ public class PermisControllerImpl implements PermisControllerInt {
 
             // 5. Sauvegarde du dossier mis à jour
             this.dossierRepository.save(dossier);
+            log.info("updateDossierPermis → dossier mis à jour, numéro={}", dossier.getNumeroDossier());
 
             // 6. Ajout de nouveaux plans d'exécution si fournis
             if (plansExecution != null && plansExecution.length > 0) {
                 List<Integer> typesIds = dto.getTypesPlansIds();
-                if (typesIds == null || typesIds.size() != plansExecution.length)
+                if (typesIds == null || typesIds.size() != plansExecution.length) {
+                    log.warn("updateDossierPermis → incohérence plans : {} types vs {} fichiers",
+                            typesIds == null ? 0 : typesIds.size(), plansExecution.length);
                     return ResponseEntity.badRequest().body(new ServerReponse(
                             "Nombre de types de plans != nombre de fichiers plans", false));
+                }
 
                 List<PlanExecution> plans = new ArrayList<>();
                 for (int i = 0; i < plansExecution.length; i++) {
@@ -294,7 +323,10 @@ public class PermisControllerImpl implements PermisControllerInt {
 
                     TypePlanExecution typePlan = this.typePlanExecutionRepository
                             .findById(typesIds.get(i)).orElse(null);
-                    if (typePlan == null) continue;
+                    if (typePlan == null) {
+                        log.warn("updateDossierPermis → TypePlanExecution introuvable, id={}", typesIds.get(i));
+                        continue;
+                    }
 
                     PlanExecution plan = new PlanExecution();
                     plan.setDossier(dossier);
@@ -309,20 +341,23 @@ public class PermisControllerImpl implements PermisControllerInt {
                     "MISE À JOUR DOSSIER PERMIS : SUCCESS — N° " + dossier.getNumeroDossier(), true));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("updateDossierPermis → erreur 500 inattendue, id={}", id, e);
             return ResponseEntity.internalServerError()
-                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
+                    .body(new ServerReponse("Erreur interne du serveur : " + e.getMessage(), false));
         }
     }
 
     // ── deleteDossierPermis ───────────────────────────────────────────────
     @Override
     public ResponseEntity<ServerReponse> deleteDossierPermis(Integer id) {
+        log.info("DELETE /dossier/delete/{}", id);
         try {
             DossierPermisBatir dossier = this.dossierRepository.findById(id).orElse(null);
-            if (dossier == null)
+            if (dossier == null) {
+                log.warn("deleteDossierPermis → dossier introuvable, id={}", id);
                 return ResponseEntity.badRequest()
                         .body(new ServerReponse("Dossier introuvable — ID : " + id, false));
+            }
 
             // 1. Suppression de tous les plans d'exécution sur Cloudinary + en base
             List<PlanExecution> plans = this.planExecutionRepository.findByDossier(dossier);
@@ -343,42 +378,48 @@ public class PermisControllerImpl implements PermisControllerInt {
             String numero = dossier.getNumeroDossier();
             this.dossierRepository.delete(dossier);
 
+            log.info("deleteDossierPermis → dossier supprimé, numéro={}", numero);
             return ResponseEntity.ok(new ServerReponse(
                     "SUPPRESSION DOSSIER PERMIS : SUCCESS — N° " + numero, true));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("deleteDossierPermis → erreur 500 inattendue, id={}", id, e);
             return ResponseEntity.internalServerError()
-                    .body(new ServerReponse("Erreur inattendue : " + e.getMessage(), false));
+                    .body(new ServerReponse("Erreur interne du serveur : " + e.getMessage(), false));
         }
+    }
+
+    @Override
+    public ResponseEntity<List<PlanExecution>> getAllPlanExecutionByDossier(Integer id) {
+        return ResponseEntity.ok(
+                this.planExecutionRepository.findByDossier(
+                        this.dossierRepository.findById(id).orElse(null)
+                )
+        );
+    }
+
+    @Override
+    public ResponseEntity<List<TypePlanExecution>> getAlLPlanExecution() {
+        return ResponseEntity.ok(this.typePlanExecutionRepository.findAll());
     }
 
     // ── Helpers privés ────────────────────────────────────────────────────
 
-    /**
-     * Upload un fichier sur Cloudinary et retourne l'URL sécurisée.
-     */
     private String uploadFichier(MultipartFile fichier) throws Exception {
         Map result = this.cloudinaryService.upload(fichier);
         return result.get("secure_url").toString();
     }
 
-    /**
-     * Supprime un fichier sur Cloudinary à partir de son URL sécurisée.
-     * Extrait le publicId depuis l'URL Cloudinary.
-     * Ne lève pas d'exception si l'URL est nulle ou mal formée.
-     */
     private void supprimerFichierCloudinary(String secureUrl) {
         if (secureUrl == null || secureUrl.isBlank()) return;
         try {
-            // URL format : https://res.cloudinary.com/xxx/image/upload/v123/dossiers/fichier.pdf
-            String[] parts      = secureUrl.split("/upload/");
-            String   apres      = parts[1];                              // v123/dossiers/fichier.pdf
-            String   sansVersion= apres.replaceFirst("v\\d+/", "");     // dossiers/fichier.pdf
-            String   publicId   = sansVersion.substring(0, sansVersion.lastIndexOf(".")); // dossiers/fichier
+            String[] parts    = secureUrl.split("/upload/");
+            String   apres    = parts[1];
+            String   sanVer   = apres.replaceFirst("v\\d+/", "");
+            String   publicId = sanVer.substring(0, sanVer.lastIndexOf("."));
             this.cloudinaryService.delete(publicId);
         } catch (Exception e) {
-            System.err.println("Cloudinary delete warning — URL : " + secureUrl + " | " + e.getMessage());
+            log.warn("supprimerFichierCloudinary → échec suppression, url={} | {}", secureUrl, e.getMessage());
         }
     }
 }
